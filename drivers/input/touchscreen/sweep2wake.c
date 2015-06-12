@@ -61,6 +61,7 @@
 #define DEFAULT_S2W_X_FINAL             120
 
 /* Resources */
+static struct wake_lock s2w_wake_lock;
 int s2w_switch = S2W_DEFAULT, s2w_s2sonly = S2W_S2SONLY_DEFAULT;
 bool s2w_scr_suspended = false;
 static int touch_x = 0, touch_y = 0;
@@ -642,6 +643,7 @@ static int __init sweep2wake_init(void)
 #ifdef CONFIG_HAS_EARLYSUSPEND
 	register_early_suspend(&s2w_early_suspend_handler);
 #endif
+	wake_lock_destroy(&s2w_wake_lock);
 
 #ifndef ANDROID_TOUCH_DECLARED
 	android_touch_kobj = kobject_create_and_add("android_touch", NULL) ;
