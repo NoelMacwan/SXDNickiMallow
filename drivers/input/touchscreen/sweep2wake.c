@@ -121,7 +121,7 @@ printk("NoelMacwan:debug dt2w pwr press");
 static DECLARE_WORK(sweep2wake_presspwr_work, sweep2wake_presspwr);
 
 /* PowerKey trigger */
-static void sweep2wake_pwrswitch(void) {
+static void sweep2wake_pwrtrigger(void) {
 	schedule_work(&sweep2wake_presspwr_work);
         return;
 }
@@ -135,7 +135,7 @@ static void sweep2wake_reset(void) {
 }
 
 /* main function for s2w */
-static void detect_s2(int sweep_coord, int sweep_height, bool st)
+static void detect_sweep2wake(int sweep_coord, int sweep_height, bool st)
 {
 	int swap_temp1, swap_temp2;
 	int prev_coord = 0, next_coord = 0;
@@ -373,22 +373,22 @@ static void s2w_input_event(struct input_handle *handle, unsigned int type,
 		"undef"), code, value);
 #endif
 	if (code == ABS_MT_SLOT) {
-		s2w_reset();
+		sweep2wake_reset();
 		return;
 	}
 
 	if (code == ABS_MT_TRACKING_ID && value == -1) {
-		s2w_reset();
+		sweep2wake_reset();
 		return;
 	}
 
 	if (code == ABS_MT_POSITION_X) {
-		last_touch_position_x  = value;
+		touch_x  = value;
 		touch_x_called = true;
 	}
 
 	if (code == ABS_MT_POSITION_Y) {
-		last_touch_position_y  = value;
+		touch_y  = value;
 		touch_y_called = true;
 	}
 
