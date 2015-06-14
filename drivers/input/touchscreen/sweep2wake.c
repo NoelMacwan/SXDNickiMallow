@@ -46,6 +46,11 @@
 #define DRIVER_VERSION "1.5"
 #define LOGTAG "[sweep2wake]: "
 
+MODULE_AUTHOR(DRIVER_AUTHOR);
+MODULE_DESCRIPTION(DRIVER_DESCRIPTION);
+MODULE_VERSION(DRIVER_VERSION);
+MODULE_LICENSE("GPLv2");
+
 /* Tuneables */
 #define S2W_DEBUG		0
 #define S2W_DEFAULT		0
@@ -61,7 +66,6 @@
 #define DEFAULT_S2W_X_FINAL             120
 
 /* Resources */
-static struct wake_lock s2w_wake_lock;
 int s2w_switch = S2W_DEFAULT, s2w_s2sonly = S2W_S2SONLY_DEFAULT;
 bool s2w_scr_suspended = false;
 static int touch_x = 0, touch_y = 0;
@@ -86,30 +90,22 @@ static int s2w_swap_coord = 0;
 static int __init read_s2w_cmdline(char *s2w)
 {
 	if (strcmp(s2w, "1") == 0) {
-		printk("[cmdline_s2w]: Sweep2Wake enabled. \
-                                | s2w='%s'\n", s2w);
+		pr_info("[cmdline_s2w]: Sweep2Wake enabled. | s2w='%s'\n", s2w);
 		s2w_switch = 1;
-	} else if (strcmp(s2w, "2") == 0) {
-		printk("[cmdline_s2w]: Sweep2Wake enabled. \
-                                | s2w='%s'\n", s2w);
-		s2w_switch = 2;
 	} else if (strcmp(s2w, "0") == 0) {
-		prink("[cmdline_s2w]: Sweep2Wake disabled. \
-                                | s2w='%s'\n", s2w);
+		pr_info("[cmdline_s2w]: Sweep2Wake disabled. | s2w='%s'\n", s2w);
 		s2w_switch = 0;
 	} else {
-		printk("[cmdline_s2w]: No valid input found. \
-                                        Going with default: | s2w='%u'\n", s2w_switch);
+		pr_info("[cmdline_s2w]: No valid input found. Going with default: | s2w='%u'\n", s2w_switch);
 	}
-	return 0;
+	return 1;
 }
 __setup("s2w=", read_s2w_cmdline);
 
 /* PowerKey work func */
-static void sweep2wake_presspwr(struct work_struct *sweep2wake_presspwr_work) {
+static void sweep2wake_presspwr(struct work_struct * sweep2wake_presspwr_work) {
 	if (!mutex_trylock(&pwrkeyworklock))
                 return;
-printk("NoelMacwan:debug dt2w pwr press");
 	input_event(sweep2wake_pwrdev, EV_KEY, KEY_POWER, 1);
 	input_event(sweep2wake_pwrdev, EV_SYN, 0, 0);
 	msleep(S2W_PWRKEY_DUR);
@@ -135,7 +131,7 @@ static void sweep2wake_reset(void) {
 	scr_on_touch = false;
 }
 
-/* main function for s2w */
+/* Sweep2wake main function */
 static void detect_sweep2wake(int sweep_coord, int sweep_height, bool st)
 {
 	int swap_temp1, swap_temp2;
@@ -384,12 +380,12 @@ static void s2w_input_event(struct input_handle *handle, unsigned int type,
 	}
 
 	if (code == ABS_MT_POSITION_X) {
-		touch_x  = value;
+		touch_x = value;
 		touch_x_called = true;
 	}
 
 	if (code == ABS_MT_POSITION_Y) {
-		touch_y  = value;
+		touch_y = value;
 		touch_y_called = true;
 	}
 
@@ -402,9 +398,7 @@ static void s2w_input_event(struct input_handle *handle, unsigned int type,
 
 static int input_dev_filter(struct input_dev *dev) {
 	if (strstr(dev->name, "touch") ||
-		strstr(dev->name, "synaptics_dsx_i2c") ||
-		strstr(dev->name, "synaptics_dsx_rmi4_i2c") ||
-		strstr(dev->name, "touchscreen")) {
+	    strstr(dev->name, "synaptics_dsx_i2c")) {
 		return 0;
 	} else {
 		return 1;
@@ -412,8 +406,7 @@ static int input_dev_filter(struct input_dev *dev) {
 }
 
 static int s2w_input_connect(struct input_handler *handler,
-				struct input_dev *dev, 
-                                const struct input_device_id *id) {
+				struct input_dev *dev, const struct input_device_id *id) {
 	struct input_handle *handle;
 	int error;
 
@@ -463,34 +456,13 @@ static struct input_handler s2w_input_handler = {
 	.id_table	= s2w_ids,
 };
 
-#ifdef CONFIG_POWERSUSPEND
-static void s2w_power_suspend(struct power_suspend *h) {
-	s2w_scr_suspended = true;
-	printk("ngxson: debug POWERSUSPEND pwr off");
-}
-
-static void s2w_power_resume(struct power_suspend *h) {
-	s2w_scr_suspended = false;
-	printk("ngxson: debug POWERSUSPEND pwr on");
-}
-
-static struct power_suspend s2w_power_suspend_handler = {
-	.suspend = s2w_power_suspend,
-	.resume = s2w_power_resume,
-};
-#endif
-
 #ifdef CONFIG_HAS_EARLYSUSPEND
 static void s2w_early_suspend(struct early_suspend *h) {
-	if(s2w_switch > 0) wake_lock(&s2w_wake_lock);
-	printk("ngxson: debug EARLYSUSPEND pwr off");
 	s2w_scr_suspended = true;
 }
 
 static void s2w_late_resume(struct early_suspend *h) {
-	if(s2w_switch > 0) wake_unlock(&s2w_wake_lock);
-	printk("ngxson: debug EARLYSUSPEND pwr on");
-        s2w_scr_suspended = false;
+	s2w_scr_suspended = false;
 }
 
 static struct early_suspend s2w_early_suspend_handler = {
@@ -516,27 +488,10 @@ static ssize_t s2w_sweep2wake_show(struct device *dev,
 static ssize_t s2w_sweep2wake_dump(struct device *dev,
 		struct device_attribute *attr, const char *buf, size_t count)
 {
-	int value;
+	if (buf[0] >= '0' && buf[0] <= '1' && buf[1] == '\n')
+                if (s2w_switch != buf[0] - '0')
+		        s2w_switch = buf[0] - '0';
 
-	if (sysfs_streq(buf, "0"))
-		value = 0;
-	else if (sysfs_streq(buf, "1"))
-		value = 1;
-	else if (sysfs_streq(buf, "2"))
-		value = 2;
-	else
-		return -EINVAL;
-	if (s2w_switch != value) {
-		// s2w_switch is safe to be changed only when !s2w_scr_suspended
-		if (s2w_scr_suspended) {
-			s2w_reset();
-			sweep2wake_pwrswitch();
-			msleep(400);
-		}
-		if (!s2w_scr_suspended) {
-			s2w_switch = value;
-		}
-	}
 	return count;
 }
 
@@ -599,11 +554,10 @@ static int __init sweep2wake_init(void)
 {
 	int rc = 0;
 	int sysfs_result;
-	wake_lock_init(&s2w_wake_lock, WAKE_LOCK_SUSPEND, "s2w");
 
 	s2w_parameters_kobj = kobject_create_and_add("s2w_parameters", kernel_kobj);
 	if (!s2w_parameters_kobj) {
-		printk("%s kobject create failed!\n", __FUNCTION__);
+		pr_err("%s kobject create failed!\n", __FUNCTION__);
 		return -ENOMEM;
         }
 
@@ -616,7 +570,7 @@ static int __init sweep2wake_init(void)
 
 	sweep2wake_pwrdev = input_allocate_device();
 	if (!sweep2wake_pwrdev) {
-		printk("Can't allocate suspend autotest power button\n");
+		pr_err("Can't allocate suspend autotest power button\n");
 		goto err_alloc_dev;
 	}
 
@@ -626,13 +580,13 @@ static int __init sweep2wake_init(void)
 
 	rc = input_register_device(sweep2wake_pwrdev);
 	if (rc) {
-		printk("%s: input_register_device err=%d\n", __func__, rc);
+		pr_err("%s: input_register_device err=%d\n", __func__, rc);
 		goto err_input_dev;
 	}
 
 	s2w_input_wq = create_workqueue("s2wiwq");
 	if (!s2w_input_wq) {
-		printk("%s: Failed to create s2wiwq workqueue\n", __func__);
+		pr_err("%s: Failed to create s2wiwq workqueue\n", __func__);
 		return -EFAULT;
 	}
 	INIT_WORK(&s2w_input_work, s2w_input_callback);
@@ -643,7 +597,6 @@ static int __init sweep2wake_init(void)
 #ifdef CONFIG_HAS_EARLYSUSPEND
 	register_early_suspend(&s2w_early_suspend_handler);
 #endif
-	wake_lock_destroy(&s2w_wake_lock);
 
 #ifndef ANDROID_TOUCH_DECLARED
 	android_touch_kobj = kobject_create_and_add("android_touch", NULL) ;
@@ -686,8 +639,3 @@ static void __exit sweep2wake_exit(void)
 
 module_init(sweep2wake_init);
 module_exit(sweep2wake_exit);
-
-MODULE_AUTHOR(DRIVER_AUTHOR);
-MODULE_DESCRIPTION(DRIVER_DESCRIPTION);
-MODULE_VERSION(DRIVER_VERSION);
-MODULE_LICENSE("GPLv2");

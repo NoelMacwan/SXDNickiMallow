@@ -40,14 +40,6 @@
 #endif
 #include <linux/wakelock.h>
 
-/* uncomment since no touchscreen defines android touch, do that here */
-//#define ANDROID_TOUCH_DECLARED
-
-/* if Sweep2Wake is compiled it will already have taken care of this */
-#ifdef CONFIG_TOUCHSCREEN_SWEEP2WAKE
-#define ANDROID_TOUCH_DECLARED
-#endif
-
 /* Version, author, desc, etc */
 #define DRIVER_AUTHOR "Dennis Rassmann <showp1984@gmail.com>"
 #define DRIVER_DESCRIPTION "DoubleTap2Wake for almost any device"
@@ -64,7 +56,7 @@
 /* Resources */
 static struct wake_lock dt2w_wake_lock;
 int dt2w_switch = 0;
-bool dt2w_scr_suspended = false;
+bool scr_suspended = false;
 bool touchdown = false;
 static bool touch_x_called = false, touch_y_called = false;
 static struct input_dev * doubletap2wake_pwrdev;
@@ -159,7 +151,7 @@ static void detect_dt2w(int x, int y, s64 trigger_time)
 
 static void dt2w_input_callback(struct work_struct *unused) {
 msleep(25);
-if (dt2w_scr_suspended) {
+if (scr_suspended) {
 	if(touchdown) {
 		touchdown = false;
 		detect_dt2w(last_touch_position_x, last_touch_position_y, ktime_to_ms(ktime_get()));
@@ -264,12 +256,12 @@ static struct input_handler dt2w_input_handler = {
 
 #ifdef CONFIG_POWERSUSPEND
 static void dt2w_power_suspend(struct power_suspend *h) {
-	dt2w_scr_suspended = true;
+	scr_suspended = true;
 	printk("ngxson: debug POWERSUSPEND pwr off");
 }
 
 static void dt2w_power_resume(struct power_suspend *h) {
-	dt2w_scr_suspended = false;
+	scr_suspended = false;
 	printk("ngxson: debug POWERSUSPEND pwr on");
 }
 
@@ -282,13 +274,13 @@ static struct power_suspend dt2w_power_suspend_handler = {
 static void dt2w_early_suspend(struct early_suspend *h) {
 	if(dt2w_switch > 0) wake_lock(&dt2w_wake_lock);
 	printk("ngxson: debug EARLYSUSPEND pwr off");
-	dt2w_scr_suspended = true;
+	scr_suspended = true;
 }
 
 static void dt2w_late_resume(struct early_suspend *h) {
 	if(dt2w_switch > 0) wake_unlock(&dt2w_wake_lock);
 	printk("ngxson: debug EARLYSUSPEND pwr on");
-	dt2w_scr_suspended = false;
+	scr_suspended = false;
 }
 
 static struct early_suspend dt2w_early_suspend_handler = {
@@ -324,13 +316,13 @@ static ssize_t dt2w_doubletap2wake_dump(struct device *dev,
 	else
 		return -EINVAL;
 	if (dt2w_switch != value) {
-		// dt2w_switch is safe to be changed only when !dt2w_scr_suspended
-		if (dt2w_scr_suspended) {
+		// dt2w_switch is safe to be changed only when !scr_suspended
+		if (scr_suspended) {
 			dt2w_reset();
 			doubletap2wake_pwrswitch();
 			msleep(400);
 		}
-		if (!dt2w_scr_suspended) {
+		if (!scr_suspended) {
 			dt2w_switch = value;
 		}
 	}
@@ -362,14 +354,9 @@ static DEVICE_ATTR(doubletap2wake_version, (S_IWUSR|S_IRUGO),
 /*
  * INIT / EXIT stuff below here
  */
-
-#ifdef ANDROID_TOUCH_DECLARED
-extern struct kobject *android_touch_kobj;
-#else
-
+//extern struct kobject *android_touch_kobj;
 struct kobject *android_touch_kobj;
 EXPORT_SYMBOL_GPL(android_touch_kobj);
-#endif
 
 static int __init doubletap2wake_init(void)
 {
@@ -401,13 +388,11 @@ static int __init doubletap2wake_init(void)
 	rc = input_register_handler(&dt2w_input_handler);
 	if (rc)
 		printk("%s: dt2w Failed to register dt2w_input_handler\n", __func__);
-
-#ifndef ANDROID_TOUCH_DECLARED    
+    
     android_touch_kobj = kobject_create_and_add("android_touch", NULL) ;
     if (android_touch_kobj == NULL) {
         pr_warn("%s: android_touch_kobj create_and_add failed\n", __func__);
     }
-#endif
     rc = sysfs_create_file(android_touch_kobj, &dev_attr_doubletap2wake.attr);
     if (rc) {
         pr_warn("%s: sysfs_create_file failed for doubletap2wake\n", __func__);
@@ -434,9 +419,7 @@ err_alloc_dev:
 
 static void __exit doubletap2wake_exit(void)
 {
-#ifndef ANDROID_TOUCH_DECLARED
     kobject_del(android_touch_kobj);
-#endif
 #ifdef CONFIG_POWERSUSPEND
 	unregister_power_suspend(&dt2w_power_suspend_handler);
 #endif

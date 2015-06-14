@@ -36,9 +36,6 @@
 #include "mdp4.h"
 
 #ifdef CONFIG_TOUCHSCREEN_PREVENT_SLEEP
-#ifdef CONFIG_TOUCHSCREEN_SWEEP2WAKE
-#include <linux/input/sweep2wake.h>
-#endif
 #ifdef CONFIG_TOUCHSCREEN_DOUBLETAP2WAKE
 #include <linux/input/doubletap2wake.h>
 #endif
@@ -153,11 +150,8 @@ static int mipi_dsi_off(struct platform_device *pdev)
 	pr_debug("%s-:\n", __func__);
 
 #ifdef CONFIG_TOUCHSCREEN_PREVENT_SLEEP
-#ifdef CONFIG_TOUCHSCREEN_SWEEP2WAKE
-	s2w_scr_suspended = true;
-#endif
 #ifdef CONFIG_TOUCHSCREEN_DOUBLETAP2WAKE
-	dt2w_scr_suspended = true;
+	scr_suspended = true;
 #endif
 #endif
 
@@ -360,11 +354,8 @@ static int mipi_dsi_on(struct platform_device *pdev)
 	pr_debug("%s-:\n", __func__);
 
 #ifdef CONFIG_TOUCHSCREEN_PREVENT_SLEEP
-#ifdef CONFIG_TOUCHSCREEN_SWEEP2WAKE
-	s2w_scr_suspended = false;
-#endif
 #ifdef CONFIG_TOUCHSCREEN_DOUBLETAP2WAKE
-	dt2w_scr_suspended = false;
+	scr_suspended = false;
 #endif
 #endif
 
