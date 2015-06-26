@@ -46,13 +46,15 @@ struct pmic8xxx_pwrkey {
 };
 
 static s64 prev_time;
+static bool btn_pressed = false;
 
 static irqreturn_t pwrkey_press_irq(int irq, void *_pwrkey)
 {
 	struct pmic8xxx_pwrkey *pwrkey = _pwrkey;
 
-	printk("ngxson: pwr button press\n");
+	//printk("ngxson: pwr button press\n");
 	prev_time = ktime_to_ms(ktime_get());
+	btn_pressed = true;
 
 	if (pwrkey->press == true) {
 		pwrkey->press = false;
@@ -71,11 +73,12 @@ static irqreturn_t pwrkey_release_irq(int irq, void *_pwrkey)
 {
 	struct pmic8xxx_pwrkey *pwrkey = _pwrkey;
 
-	printk("ngxson: pwr button release\n");
-	if((ktime_to_ms(ktime_get()) - prev_time) > REBOOT_PWRKEY_DUR) {
+	//printk("ngxson: pwr button release\n");
+	if(((ktime_to_ms(ktime_get()) - prev_time) > REBOOT_PWRKEY_DUR) && btn_pressed) {
 		printk("ngxson: reboot now\n");
 		machine_restart(NULL);
 	}
+	btn_pressed = false;
 
 	if (pwrkey->press == false) {
 		input_report_key(pwrkey->pwr, KEY_POWER, 1);
