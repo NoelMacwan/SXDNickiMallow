@@ -1612,7 +1612,7 @@ static int mxt_load_fw(struct device *dev, const char *fn)
 	}
 
 	ret = request_firmware(&fw, fn, dev);
-	if (ret < 0) {
+	if (ret < 0 || !fw) {
 		dev_err(dev, "Unable to open firmware %s\n", fn);
 		goto free_frame;
 	}
@@ -1642,6 +1642,9 @@ static int mxt_load_fw(struct device *dev, const char *fn)
 		/* Unlock bootloader */
 		mxt_unlock_bootloader(client);
 	}
+
+	if (fw == NULL)
+		goto return_to_app_mode;
 
 	while (pos < fw->size) {
 		ret = mxt_check_bootloader(client,

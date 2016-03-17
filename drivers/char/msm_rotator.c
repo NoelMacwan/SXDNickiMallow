@@ -1,4 +1,4 @@
-/* Copyright (c) 2009-2013, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2009-2013, 2016, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -19,7 +19,6 @@
 #include <linux/sched.h>
 #include <linux/uaccess.h>
 #include <linux/clk.h>
-#include <linux/android_pmem.h>
 #include <linux/msm_rotator.h>
 #include <linux/io.h>
 #include <mach/msm_rotator_imem.h>
@@ -1694,10 +1693,6 @@ static int get_img(struct msmfb_data *fbd, int domain,
 	struct file *file = NULL;
 	int put_needed, fb_num;
 #endif
-#ifdef CONFIG_ANDROID_PMEM
-	unsigned long vstart;
-#endif
-
 	*p_need = 0;
 
 #ifdef CONFIG_FB
@@ -1728,27 +1723,14 @@ static int get_img(struct msmfb_data *fbd, int domain,
 	}
 #endif
 
-#ifdef CONFIG_MSM_MULTIMEDIA_USE_ION
 	return msm_rotator_iommu_map_buf(fbd->memory_id, domain, start,
 		len, p_ihdl, secure);
-#endif
-#ifdef CONFIG_ANDROID_PMEM
-	if (!get_pmem_file(fbd->memory_id, start, &vstart, len, p_file))
-		return 0;
-	else
-		return -ENOMEM;
-#endif
 
 }
 
 static void put_img(struct file *p_file, struct ion_handle *p_ihdl,
 	int domain, unsigned int secure)
 {
-#ifdef CONFIG_ANDROID_PMEM
-	if (p_file != NULL)
-		put_pmem_file(p_file);
-#endif
-
 #ifdef CONFIG_MSM_MULTIMEDIA_USE_ION
 	if (!IS_ERR_OR_NULL(p_ihdl)) {
 		pr_debug("%s(): p_ihdl %p\n", __func__, p_ihdl);
@@ -2811,6 +2793,10 @@ static int __devinit msm_rotator_probe(struct platform_device *pdev)
 	msm_rotator_dev->last_session_idx = INVALID_SESSION;
 
 	pdata = pdev->dev.platform_data;
+	if (!pdata) {
+		pr_err("%s: No device\n", __func__);
+		return -ENODEV;
+	}
 	number_of_clks = pdata->number_of_clocks;
 	rot_iommu_split_domain = pdata->rot_iommu_split_domain;
 
@@ -2826,13 +2812,23 @@ static int __devinit msm_rotator_probe(struct platform_device *pdev)
 	msm_rotator_dev->core_clk = NULL;
 	msm_rotator_dev->pclk = NULL;
 
-	mrd->y_rot_buf = kmalloc(sizeof(struct rot_buf_type), GFP_KERNEL);
-	mrd->chroma_rot_buf = kmalloc(sizeof(struct rot_buf_type), GFP_KERNEL);
-	mrd->chroma2_rot_buf = kmalloc(sizeof(struct rot_buf_type), GFP_KERNEL);
-
-	memset((void *)mrd->y_rot_buf, 0, sizeof(struct rot_buf_type));
-	memset((void *)mrd->chroma_rot_buf, 0, sizeof(struct rot_buf_type));
-	memset((void *)mrd->chroma2_rot_buf, 0, sizeof(struct rot_buf_type));
+	mrd->y_rot_buf = kzalloc(sizeof(struct rot_buf_type), GFP_KERNEL);
+	if (!mrd->y_rot_buf)
+		return -ENOMEM;
+	mrd->chroma_rot_buf = kzalloc(sizeof(struct rot_buf_type), GFP_KERNEL);
+	if (!mrd->chroma_rot_buf) {
+		kfree(mrd->y_rot_buf);
+		mrd->y_rot_buf = NULL;
+		return -ENOMEM;
+	}
+	mrd->chroma2_rot_buf = kzalloc(sizeof(struct rot_buf_type), GFP_KERNEL);
+	if (!mrd->chroma2_rot_buf) {
+		kfree(mrd->y_rot_buf);
+		kfree(mrd->chroma_rot_buf);
+		mrd->y_rot_buf = NULL;
+		mrd->chroma_rot_buf = NULL;
+		return -ENOMEM;
+	}
 
 #ifdef CONFIG_MSM_BUS_SCALING
 	if (!msm_rotator_dev->bus_client_handle && pdata &&
