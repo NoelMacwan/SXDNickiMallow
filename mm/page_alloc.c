@@ -208,6 +208,7 @@ static char * const zone_names[MAX_NR_ZONES] = {
  int wmark_min_kbytes = 5752;
  int wmark_low_kbytes = 7190;
  int wmark_high_kbytes = 8628;
+ int min_free_order_shift = 1;
 
 /*
  * Extra memory for the system to try freeing. Used to temporarily
